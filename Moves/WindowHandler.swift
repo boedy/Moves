@@ -5,6 +5,9 @@ import Defaults
 class WindowHandler {
   var monitors: [Any?] = []
   var window: AccessibilityElement?
+  var trackedWindowOrigin: CGPoint = .zero
+  var trackedWindowSize: CGSize = .zero
+  var initialMouseLocation: CGPoint = .zero
 
   var intention: Intention = .idle {
     didSet { intentionChanged(self.intention) }
@@ -27,8 +30,6 @@ class WindowHandler {
 
     let app = window.application
 
-    // App is excluded?
-
     if let path = applicationPath(app: app),
       Defaults[.excludedApplicationPaths].contains(path)
     {
@@ -36,6 +37,9 @@ class WindowHandler {
     }
 
     self.window = window
+    self.initialMouseLocation = loc
+    self.trackedWindowOrigin = window.position ?? .zero
+    self.trackedWindowSize = window.size ?? .zero
 
     if Defaults[.bringToFront] {
       try? app?.setAttribute(.frontmost, value: true)
@@ -101,15 +105,21 @@ class WindowHandler {
 
   private func move(_ event: NSEvent) {
     guard let window = self.window else { return }
-    guard let pos = window.position else { return }
-    let dest = CGPoint(x: pos.x + event.deltaX, y: pos.y + event.deltaY)
+    let currentMouse = Mouse.location()
+    let dest = CGPoint(
+      x: trackedWindowOrigin.x + (currentMouse.x - initialMouseLocation.x),
+      y: trackedWindowOrigin.y + (currentMouse.y - initialMouseLocation.y)
+    )
     window.moveTo(dest)
   }
 
   private func resize(_ event: NSEvent) {
     guard let window = self.window else { return }
-    guard let size = window.size else { return }
-    let dest = CGSize(width: size.width + event.deltaX, height: size.height + event.deltaY)
+    let currentMouse = Mouse.location()
+    let dest = CGSize(
+      width: max(50, trackedWindowSize.width + (currentMouse.x - initialMouseLocation.x)),
+      height: max(50, trackedWindowSize.height + (currentMouse.y - initialMouseLocation.y))
+    )
     window.resizeTo(dest)
   }
 
